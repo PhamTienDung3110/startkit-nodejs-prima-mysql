@@ -70,17 +70,28 @@ export const AuthService = {
    * @param email - Email của user
    * @param password - Plain password để verify
    * @param meta - Metadata từ request (IP, User-Agent) để tracking
-   * @returns Object chứa accessToken và refreshToken
+   * @returns Object chứa accessToken, refreshToken và user info (không có password)
    * @throws Error('INVALID_CREDENTIALS') nếu email hoặc password không đúng
+   * 
+   * Security Note: 
+   * - Luôn throw cùng một error message để tránh tiết lộ thông tin
+   * - Không phân biệt giữa "email không tồn tại" và "password sai"
+   * - Điều này giúp bảo vệ user privacy và tránh enumeration attacks
    */
   async login(email: string, password: string, meta?: { ip?: string; userAgent?: string }) {
     // Tìm user theo email
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) throw new Error('INVALID_CREDENTIALS');
+    
+    // Verify password - chỉ verify nếu user tồn tại
+    // Nếu user không tồn tại hoặc password sai, throw cùng một error
+    if (!user) {
+      throw new Error('INVALID_CREDENTIALS');
+    }
 
-    // Verify password
-    const ok = await comparePassword(password, user.password);
-    if (!ok) throw new Error('INVALID_CREDENTIALS');
+    const isValid = await comparePassword(password, user.password);
+    if (!isValid) {
+      throw new Error('INVALID_CREDENTIALS');
+    }
 
     // Tạo JWT payload (chứa user id và role)
     const payload = { sub: user.id, role: user.role } as const;
@@ -101,7 +112,17 @@ export const AuthService = {
       },
     });
 
-    return { accessToken, refreshToken };
+    // Trả về tokens và user info (không có password)
+    return {
+      accessToken,
+      refreshToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+      }
+    };
   },
 
   /**

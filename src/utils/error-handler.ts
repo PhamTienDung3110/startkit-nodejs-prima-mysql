@@ -15,7 +15,10 @@ export interface ErrorResponse {
 export const ErrorMap: Record<string, ErrorResponse> = {
   // Authentication Errors
   EMAIL_EXISTS: { status: 409, message: 'Email already exists' },
-  INVALID_CREDENTIALS: { status: 401, message: 'Invalid credentials' },
+  INVALID_CREDENTIALS: { 
+    status: 401, 
+    message: 'Email or password is incorrect' 
+  },
   TOKEN_EXPIRED: { status: 401, message: 'Token expired' },
   TOKEN_INVALID: { status: 401, message: 'Invalid token' },
   UNAUTHORIZED: { status: 401, message: 'Unauthorized' },

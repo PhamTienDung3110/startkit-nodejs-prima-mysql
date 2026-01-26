@@ -6,7 +6,6 @@
 import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { handleError } from '../../utils/error-handler';
-import { prisma } from '../../db/prisma';
 
 // Create module-specific error handler
 const handleAuthError = (error: any, res: Response) =>
@@ -144,24 +143,18 @@ export const AuthController = {
    */
   async login(req: Request, res: Response) {
     try {
-      // Tìm user để lấy thông tin
-      const user = await prisma.user.findUnique({
-        where: { email: req.body.email },
-        select: { id: true, email: true, name: true, role: true }
-      });
-      if (!user) throw new Error('INVALID_CREDENTIALS');
-
       // Gọi service với metadata từ request (IP, User-Agent để tracking)
-      const tokens = await AuthService.login(req.body.email, req.body.password, {
+      // Service sẽ handle toàn bộ logic: check user, verify password, và trả về tokens + user
+      const result = await AuthService.login(req.body.email, req.body.password, {
         ip: req.ip, // IP address của client
         userAgent: req.headers['user-agent'], // User agent string
       });
 
       // Trả về tokens và user info
       return res.json({
-        accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken,
-        user
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+        user: result.user
       });
     } catch (e: any) {
       return handleAuthError(e, res);
