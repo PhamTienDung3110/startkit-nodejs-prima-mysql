@@ -36,40 +36,28 @@ export function createApp() {
   app.use(express.json({ limit: '1mb' }));
 
   // Cấu hình CORS - cho phép cross-origin requests
-  const allowedOrigins = env.CORS_ORIGIN
-    ? env.CORS_ORIGIN.split(',').map((origin) => origin.trim())
-    : [
-        'http://localhost:3001', // Next.js frontend
-        'http://localhost:3000', // Alternative frontend port
-        'http://localhost:5173', // Vite frontend
-      ];
+  const allowedOrigins = process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',')
+    : [];
 
-  app.use(
-    cors({
-      origin: (origin, callback) => {
-        // Cho phép requests không có origin (mobile apps, Postman, etc.)
-        if (!origin) {
-          return callback(null, true);
-        }
+  app.use(cors({
+    origin: (origin, callback) => {
+      // Cho phép curl, postman, server-to-server
+      if (!origin) return callback(null, true);
 
-        // Kiểm tra origin có trong danh sách allowed không
-        if (allowedOrigins.includes(origin)) {
-          return callback(null, true);
-        }
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
 
-        // Trong development, cho phép tất cả localhost origins
-        if (env.NODE_ENV === 'development' && origin.startsWith('http://localhost:')) {
-          return callback(null, true);
-        }
+      console.log('❌ CORS blocked origin:', origin);
+      return callback(new Error('Not allowed by CORS'));
+    },
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  }));
 
-        // Từ chối origin không được phép
-        callback(new Error('Not allowed by CORS'));
-      },
-      credentials: true, // Cho phép gửi cookies qua CORS
-      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
-    }),
-  );
+  // PRE-FLIGHT (RẤT QUAN TRỌNG)
+  app.options('*', cors());
 
   // Swagger JSON spec endpoint
   app.get('/api-docs.json', (req, res) => {
