@@ -24,6 +24,28 @@ import { errorMiddleware } from './middlewares/error.middleware';
 export function createApp() {
   const app = express();
 
+    // Cấu hình CORS - cho phép cross-origin requests
+    const allowedOrigins = (
+      process.env.CORS_ORIGIN || ''
+    ).split(',').map(o => o.trim());
+    
+    app.use(cors({
+      origin: (origin, callback) => {
+        // Cho phép server-to-server, postman, health check
+        if (!origin) return callback(null, true);
+    
+        if (allowedOrigins.includes(origin)) {
+          return callback(null, true);
+        }
+    
+        console.log('❌ CORS blocked origin:', origin);
+        return callback(new Error('Not allowed by CORS'));
+      },
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
+    }));
+  
+
   // Middleware logging HTTP requests với Pino
   app.use(pinoHttp({ logger }));
   // Middleware bảo mật - thêm các HTTP headers an toàn
@@ -34,27 +56,6 @@ export function createApp() {
   app.use(cookieParser());
   // Middleware parse JSON body với giới hạn 1MB
   app.use(express.json({ limit: '1mb' }));
-
-  // Cấu hình CORS - cho phép cross-origin requests
-  const allowedOrigins = (
-    process.env.CORS_ORIGIN || ''
-  ).split(',').map(o => o.trim());
-  
-  app.use(cors({
-    origin: (origin, callback) => {
-      // Cho phép server-to-server, postman, health check
-      if (!origin) return callback(null, true);
-  
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-  
-      console.log('❌ CORS blocked origin:', origin);
-      return callback(new Error('Not allowed by CORS'));
-    },
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-  }));
 
   // Swagger JSON spec endpoint
   app.get('/api-docs.json', (req, res) => {
