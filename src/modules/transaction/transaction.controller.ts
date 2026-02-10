@@ -100,6 +100,7 @@ export const TransactionController = {
       }
 
       // Parse query parameters
+      const excludeLoanRelated = req.query.excludeLoanRelated === 'true' || req.query.excludeLoanRelated === '1';
       const filters = {
         type: req.query.type as 'income' | 'expense' | 'transfer' | undefined,
         startDate: req.query.startDate ? new Date(req.query.startDate as string) : undefined,
@@ -107,7 +108,8 @@ export const TransactionController = {
         categoryId: req.query.categoryId as string | undefined,
         walletId: req.query.walletId as string | undefined,
         limit: req.query.limit ? parseInt(req.query.limit as string) : 50,
-        offset: req.query.offset ? parseInt(req.query.offset as string) : 0
+        offset: req.query.offset ? parseInt(req.query.offset as string) : 0,
+        excludeLoanRelated
       };
 
       // Validate limit và offset

@@ -85,7 +85,7 @@ export const LoanService = {
         }
       });
 
-      // 2. Tạo Transaction tương ứng
+      // 2. Tạo Transaction tương ứng (giao dịch gốc của Loan)
       const transactionType = kind === 'you_owe' ? 'income' : 'expense';
       const entryDirection = kind === 'you_owe' ? 'in' : 'out';
 
@@ -111,6 +111,7 @@ export const LoanService = {
           categoryId,
           amount: principal,
           note: note || `${kind === 'you_owe' ? 'Vay nợ' : 'Cho vay'}: ${counterpartyName}`,
+          loanId: loan.id, // ✅ đánh dấu giao dịch gốc của khoản vay
           entries: {
             create: {
               walletId,
@@ -144,6 +145,7 @@ export const LoanService = {
         });
       }
 
+      // Có thể return kèm transaction nếu FE cần sau này
       return loan;
     });
   },
@@ -303,19 +305,13 @@ export const LoanService = {
         throw new Error('LOAN_HAS_PAYMENTS');
       }
 
-      // 2. Thử tìm Transaction gốc đã được tạo khi tạo loan để hoàn tiền
-      //    Do schema hiện tại không link trực tiếp Loan <-> Transaction,
-      //    ta dựa theo: userId, amount, type, ngày và note chứa counterpartyName.
-      const transactionType = loan.kind === 'you_owe' ? 'income' : 'expense';
-
+      // 2. Tìm Transaction gốc đã được tạo khi tạo loan để hoàn tiền
+      //    Giờ đã link trực tiếp Loan <-> Transaction qua loanId
       const baseTransaction = await tx.transaction.findFirst({
         where: {
           userId,
           deletedAt: null,
-          type: transactionType,
-          amount: loan.principal,
-          transactionDate: loan.startDate,
-          note: loan.note ? { contains: loan.counterpartyName } : undefined
+          loanId: loan.id
         },
         include: {
           entries: true

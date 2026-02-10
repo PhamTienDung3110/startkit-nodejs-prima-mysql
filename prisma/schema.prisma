@@ -312,6 +312,10 @@ model Transaction {
   // Nếu transaction được tạo từ LoanPayment => map 1-1
   loanPayment LoanPayment?
 
+  // Nếu transaction là giao dịch gốc khi tạo Loan (giải ngân ban đầu)
+  loanId String? @unique
+  loan   Loan? @relation("LoanBaseTransaction", fields: [loanId], references: [id], onDelete: Cascade)
+
   // Timestamps
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -395,6 +399,9 @@ model Loan {
 
   // 1 loan có nhiều payments
   payments LoanPayment[]
+
+  // Giao dịch gốc tạo khoản vay (giải ngân ban đầu)
+  baseTransaction Transaction? @relation("LoanBaseTransaction")
 
   // Timestamps
   createdAt DateTime @default(now())

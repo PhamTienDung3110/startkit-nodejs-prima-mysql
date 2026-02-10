@@ -288,6 +288,8 @@ export const TransactionService = {
     walletId?: string;
     limit?: number;
     offset?: number;
+    /** Loại trừ giao dịch phát sinh từ trả nợ/thu nợ (LoanPayment) */
+    excludeLoanRelated?: boolean;
   }) {
     const {
       type,
@@ -296,28 +298,63 @@ export const TransactionService = {
       categoryId,
       walletId,
       limit = 50,
-      offset = 0
+      offset = 0,
+      excludeLoanRelated = false
     } = filters || {};
 
-    // Build where clause
-    const where: any = {
+    // Build where clause cơ bản (không tính loan filter)
+    const baseWhere: any = {
       userId,
       deletedAt: null // Không lấy soft deleted transactions
     };
 
-    if (type) where.type = type;
+    if (type) baseWhere.type = type;
     if (startDate || endDate) {
-      where.transactionDate = {};
-      if (startDate) where.transactionDate.gte = startDate;
-      if (endDate) where.transactionDate.lte = endDate;
+      baseWhere.transactionDate = {};
+      if (startDate) baseWhere.transactionDate.gte = startDate;
+      if (endDate) baseWhere.transactionDate.lte = endDate;
     }
-    if (categoryId) where.categoryId = categoryId;
+    if (categoryId) baseWhere.categoryId = categoryId;
+
+    // where cuối cùng (có thể được wrap lại nếu excludeLoanRelated = true)
+    let where: any = baseWhere;
+
+    // Loại toàn bộ giao dịch liên quan vay nợ khỏi thống kê thu/chi:
+    // - Giao dịch phát sinh từ LoanPayment (trả nợ / thu nợ)  => có loanPayment
+    // - Giao dịch gốc khi tạo Loan (giải ngân ban đầu)       => có loanId
+    if (excludeLoanRelated) {
+      where = {
+        AND: [
+          baseWhere,
+          {
+            NOT: {
+              OR: [
+                { loanPayment: { isNot: null } },
+                { loanId: { not: null } }
+              ]
+            }
+          }
+        ]
+      };
+    }
 
     // Filter theo wallet nếu có
     if (walletId) {
-      where.entries = {
-        some: { walletId }
-      };
+      if (excludeLoanRelated) {
+        // Đã wrap bằng AND ở trên -> nối thêm điều kiện entries
+        where.AND = [
+          ...(where.AND || []),
+          {
+            entries: {
+              some: { walletId }
+            }
+          }
+        ];
+      } else {
+        where.entries = {
+          some: { walletId }
+        };
+      }
     }
 
     const transactions = await prisma.transaction.findMany({
