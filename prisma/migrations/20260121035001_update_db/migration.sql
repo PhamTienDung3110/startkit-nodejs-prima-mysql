@@ -164,4 +164,4 @@ ALTER TABLE `LoanPayment` ADD CONSTRAINT `LoanPayment_walletId_fkey` FOREIGN KEY
 ALTER TABLE `LoanPayment` ADD CONSTRAINT `LoanPayment_transactionId_fkey` FOREIGN KEY (`transactionId`) REFERENCES `Transaction`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- RenameIndex
-ALTER TABLE `refreshtoken` RENAME INDEX `RefreshToken_userId_fkey` TO `RefreshToken_userId_idx`;
+ALTER TABLE `RefreshToken` RENAME INDEX `RefreshToken_userId_fkey` TO `RefreshToken_userId_idx`;

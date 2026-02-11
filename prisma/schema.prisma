@@ -141,6 +141,8 @@ model RefreshToken {
   // Index tối ưu query theo user và dọn token hết hạn
   @@index([userId])
   @@index([expiresAt])
+  // Map sang tên bảng lowercase để tránh lỗi phân biệt hoa/thường trên Linux
+  @@map("refreshtoken")
 }
 
 // =========================
