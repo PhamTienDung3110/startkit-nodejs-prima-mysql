@@ -62,27 +62,13 @@ export const AuthService = {
       select: { id: true, email: true, name: true, role: true },
     });
 
-    // Tạo ví tiền mặt mặc định và các danh mục mặc định cho user mới (trong transaction)
-    await prisma.$transaction(async (tx) => {
-      // 1. Ví tiền mặt: value 0
-      await tx.wallet.create({
-        data: {
-          userId: user.id,
-          name: 'Tiền mặt',
-          type: 'cash',
-          openingBalance: 0,
-          currentBalance: 0
-        }
-      });
-
-      // 2. Danh mục mặc định: Ăn uống (chi tiêu), Lương (thu nhập), Mua sắm (chi tiêu)
-      await tx.category.createMany({
-        data: [
-          { userId: user.id, name: 'Ăn uống', type: 'expense', icon: 'utensils', sortOrder: 0, isSystem: true },
-          { userId: user.id, name: 'Lương', type: 'income', icon: 'wallet', sortOrder: 0, isSystem: true },
-          { userId: user.id, name: 'Mua sắm', type: 'expense', icon: 'shopping-cart', sortOrder: 1, isSystem: true }
-        ]
-      });
+    // Chỉ tạo danh mục mặc định cho user mới (không tạo ví default)
+    await prisma.category.createMany({
+      data: [
+        { userId: user.id, name: 'Ăn uống', type: 'expense', icon: 'utensils', sortOrder: 0, isSystem: true },
+        { userId: user.id, name: 'Lương', type: 'income', icon: 'wallet', sortOrder: 0, isSystem: true },
+        { userId: user.id, name: 'Mua sắm', type: 'expense', icon: 'shopping-cart', sortOrder: 1, isSystem: true }
+      ]
     });
 
     return user;

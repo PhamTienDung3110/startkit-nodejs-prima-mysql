@@ -1,4 +1,33 @@
 -- CreateTable
+CREATE TABLE `User` (
+    `id` VARCHAR(191) NOT NULL,
+    `email` VARCHAR(191) NOT NULL,
+    `password` VARCHAR(191) NOT NULL,
+    `name` VARCHAR(191) NULL,
+    `role` ENUM('USER', 'ADMIN') NOT NULL DEFAULT 'USER',
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
+
+    UNIQUE INDEX `User_email_key`(`email`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `refreshtoken` (
+    `id` VARCHAR(191) NOT NULL,
+    `tokenHash` VARCHAR(191) NOT NULL,
+    `userId` VARCHAR(191) NOT NULL,
+    `ip` VARCHAR(191) NULL,
+    `userAgent` VARCHAR(191) NULL,
+    `expiresAt` DATETIME(3) NOT NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+    INDEX `refreshtoken_userId_idx`(`userId`),
+    INDEX `refreshtoken_expiresAt_idx`(`expiresAt`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
 CREATE TABLE `Wallet` (
     `id` VARCHAR(191) NOT NULL,
     `userId` VARCHAR(191) NOT NULL,
@@ -59,9 +88,11 @@ CREATE TABLE `Transaction` (
     `amount` DECIMAL(18, 2) NOT NULL,
     `note` TEXT NULL,
     `deletedAt` DATETIME(3) NULL,
+    `loanId` VARCHAR(191) NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
+    UNIQUE INDEX `Transaction_loanId_key`(`loanId`),
     INDEX `Transaction_userId_transactionDate_idx`(`userId`, `transactionDate`),
     INDEX `Transaction_userId_type_transactionDate_idx`(`userId`, `type`, `transactionDate`),
     INDEX `Transaction_userId_categoryId_transactionDate_idx`(`userId`, `categoryId`, `transactionDate`),
@@ -124,8 +155,8 @@ CREATE TABLE `LoanPayment` (
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
--- CreateIndex
-CREATE INDEX `RefreshToken_expiresAt_idx` ON `RefreshToken`(`expiresAt`);
+-- AddForeignKey
+ALTER TABLE `refreshtoken` ADD CONSTRAINT `refreshtoken_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `Wallet` ADD CONSTRAINT `Wallet_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
@@ -141,6 +172,9 @@ ALTER TABLE `Transaction` ADD CONSTRAINT `Transaction_userId_fkey` FOREIGN KEY (
 
 -- AddForeignKey
 ALTER TABLE `Transaction` ADD CONSTRAINT `Transaction_categoryId_fkey` FOREIGN KEY (`categoryId`) REFERENCES `Category`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `Transaction` ADD CONSTRAINT `Transaction_loanId_fkey` FOREIGN KEY (`loanId`) REFERENCES `Loan`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `TransactionEntry` ADD CONSTRAINT `TransactionEntry_transactionId_fkey` FOREIGN KEY (`transactionId`) REFERENCES `Transaction`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
@@ -162,6 +196,3 @@ ALTER TABLE `LoanPayment` ADD CONSTRAINT `LoanPayment_walletId_fkey` FOREIGN KEY
 
 -- AddForeignKey
 ALTER TABLE `LoanPayment` ADD CONSTRAINT `LoanPayment_transactionId_fkey` FOREIGN KEY (`transactionId`) REFERENCES `Transaction`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- RenameIndex
-ALTER TABLE `RefreshToken` RENAME INDEX `RefreshToken_userId_fkey` TO `RefreshToken_userId_idx`;
