@@ -648,7 +648,7 @@ export const TransactionService = {
       orderBy: {
         transactionDate: 'desc'
       },
-      take: limit,
+      take: limit === -1 ? undefined : limit,
       skip: offset
     });
 
@@ -661,7 +661,7 @@ export const TransactionService = {
         total,
         limit,
         offset,
-        hasMore: offset + limit < total
+        hasMore: limit === -1 ? false : offset + limit < total
       }
     };
   }

@@ -113,8 +113,8 @@ export const TransactionController = {
       };
 
       // Validate limit và offset
-      if (filters.limit && (filters.limit < 1 || filters.limit > 100)) {
-        return res.status(400).json({ message: 'Limit must be between 1 and 100' });
+      if (filters.limit && filters.limit !== -1 && (filters.limit < 1 || filters.limit > 100)) {
+        return res.status(400).json({ message: 'Limit must be between 1 and 100, or -1 for unlimited' });
       }
       if (filters.offset && filters.offset < 0) {
         return res.status(400).json({ message: 'Offset must be non-negative' });
