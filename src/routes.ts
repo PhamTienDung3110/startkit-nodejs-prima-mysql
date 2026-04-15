@@ -21,6 +21,8 @@ import { TransactionTemplateController } from './modules/transaction-template/tr
 import { createTemplateSchema, createTemplateFromTransactionSchema, updateTemplateSchema } from './modules/transaction-template/transaction-template.schema';
 import { GoalController } from './modules/goal/goal.controller';
 import { createGoalSchema, updateGoalSchema, createMilestoneSchema, updateMilestoneSchema } from './modules/goal/goal.schema';
+import { PendingTransactionController } from './modules/pending-transaction/pending-transaction.controller';
+import { updatePendingTransactionSchema } from './modules/pending-transaction/pending-transaction.schema';
 
 // Tạo router instance để định nghĩa các routes
 export const routes = Router();
@@ -42,6 +44,8 @@ routes.get('/users/me', requireAuth, UsersController.me);
 routes.get('/users', requireAuth, requireRole(['ADMIN']), UsersController.list);
 
 // ========== Transaction Routes ==========
+routes.get('/transactions/pending', requireAuth, PendingTransactionController.getPendingTransactions);
+routes.patch('/transactions/pending/:id/status', requireAuth, validateBody(updatePendingTransactionSchema), PendingTransactionController.updateStatus);
 routes.post('/transactions', requireAuth, validateBody(createTransactionSchema), TransactionController.createTransaction);
 routes.get('/transactions', requireAuth, TransactionController.getTransactions);
 routes.put('/transactions/:id', requireAuth, validateBody(updateTransactionSchema), TransactionController.updateTransaction);
@@ -96,3 +100,6 @@ routes.delete('/goals/:id', requireAuth, GoalController.deleteGoal);
 routes.post('/goals/milestones', requireAuth, validateBody(createMilestoneSchema), GoalController.createMilestone);
 routes.put('/goals/milestones/:id', requireAuth, validateBody(updateMilestoneSchema), GoalController.updateMilestone);
 routes.delete('/goals/milestones/:id', requireAuth, GoalController.deleteMilestone);
+
+// ========== Webhooks Routes ==========
+routes.post('/webhooks/email-inbound', PendingTransactionController.inboundWebhook);

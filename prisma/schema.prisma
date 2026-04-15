@@ -108,6 +108,13 @@ enum GoalCategory {
   career    // sự nghiệp
 }
 
+// PendingTransactionStatus: trạng thái của giao dịch nháp từ email
+enum PendingTransactionStatus {
+  pending
+  approved
+  rejected
+}
+
 // =========================
 // AUTH MODELS
 // =========================
@@ -155,6 +162,9 @@ model User {
 
   // 1 user có nhiều mục tiêu
   goals Goal[]
+
+  // 1 user có nhiều giao dịch nháp (từ email/sms)
+  pendingTransactions PendingTransaction[]
 
   // Timestamps
   createdAt DateTime @default(now())
@@ -378,6 +388,36 @@ model Transaction {
 
   // Index để lọc record chưa bị soft delete
   @@index([deletedAt])
+}
+
+// =========================
+// PENDING TRANSACTIONS (Drafts from Inbound Sources like Email/SMS)
+// =========================
+
+model PendingTransaction {
+  id String @id @default(uuid()) // PK
+
+  // FK -> User
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Trích xuất được
+  parsedAmount Decimal? @db.Decimal(18, 2)
+  parsedType   TransactionType?
+  parsedNote   String?  @db.Text
+  bankName     String?
+
+  // Lưu lại nội dung raw để xem lại nếu AI sai
+  rawEmailText String?  @db.Text
+
+  // Trạng thái
+  status PendingTransactionStatus @default(pending)
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, status])
 }
 
 // TransactionEntry: bút toán tác động lên ví
