@@ -181,7 +181,8 @@ export const PendingTransactionService = {
         transactionDate: parsed.transactionDate,
         note: parsed.note
       },
-      userId
+      userId,
+      true // Bỏ qua kiểm tra số dư khi tự động đồng bộ từ ngân hàng
     );
 
     // 5. Lưu lại lịch sử giao dịch tự động đồng bộ (PendingTransaction -> status: approved)

@@ -15,8 +15,13 @@ export const PendingTransactionController = {
         message: 'Vietcombank email processed successfully',
         data: result
       });
-    } catch (error) {
-      next(error);
+    } catch (error: any) {
+      console.error('[InboundWebhook Error]:', error);
+      res.status(200).json({
+        ok: false,
+        message: error?.message || 'Error processing email webhook',
+        error: String(error)
+      });
     }
   },
 

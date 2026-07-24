@@ -110,23 +110,25 @@ async function createIncomeTransaction(data: CreateTransactionData & { type: 'in
  * Logic: 1 entry (direction: out) từ wallet, giảm currentBalance
  * Kiểm tra số dư trước khi thực hiện
  */
-async function createExpenseTransaction(data: CreateTransactionData & { type: 'expense' }, userId: string) {
+async function createExpenseTransaction(data: CreateTransactionData & { type: 'expense' }, userId: string, skipBalanceCheck = false) {
   const { walletId, categoryId, transactionDate, amount, note } = data;
 
-  // Validate wallet và kiểm tra số dư
-  await validateWalletOwnership(walletId, userId, amount);
+  // Validate wallet và kiểm tra số dư (bỏ qua kiểm tra số dư nếu skipBalanceCheck = true)
+  await validateWalletOwnership(walletId, userId, skipBalanceCheck ? undefined : amount);
   await validateCategoryOwnership(categoryId!, userId, 'expense');
 
   // Tạo transaction và entry trong DB transaction
   return await prisma.$transaction(async (tx) => {
-    // Kiểm tra lại số dư trong transaction để tránh race condition
-    const wallet = await tx.wallet.findUnique({
-      where: { id: walletId },
-      select: { currentBalance: true }
-    });
+    if (!skipBalanceCheck) {
+      // Kiểm tra lại số dư trong transaction để tránh race condition
+      const wallet = await tx.wallet.findUnique({
+        where: { id: walletId },
+        select: { currentBalance: true }
+      });
 
-    if (!wallet || wallet.currentBalance.toNumber() < amount) {
-      throw new Error('INSUFFICIENT_WALLET_BALANCE');
+      if (!wallet || wallet.currentBalance.toNumber() < amount) {
+        throw new Error('INSUFFICIENT_WALLET_BALANCE');
+      }
     }
 
     // 1. Tạo Transaction header
@@ -343,13 +345,13 @@ export const TransactionService = {
    * @returns Transaction object với entries
    * @throws Error nếu validation fail hoặc có lỗi database
    */
-  async createTransaction(data: CreateTransactionData, userId: string) {
+  async createTransaction(data: CreateTransactionData, userId: string, skipBalanceCheck = false) {
     switch (data.type) {
       case 'income':
         return await createIncomeTransaction(data, userId);
 
       case 'expense':
-        return await createExpenseTransaction(data, userId);
+        return await createExpenseTransaction(data, userId, skipBalanceCheck);
 
       case 'transfer':
         return await createTransferTransaction(data, userId);
