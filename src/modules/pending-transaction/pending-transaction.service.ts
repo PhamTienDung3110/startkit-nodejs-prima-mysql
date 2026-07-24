@@ -8,11 +8,10 @@ import { TransactionService } from '../transaction/transaction.service';
  * Tìm hoặc tự động tạo Ví Vietcombank cho User
  */
 async function findOrCreateBankWallet(userId: string) {
-  // Tìm ví dạng bank có chứa tên Vietcombank hoặc bất kỳ ví bank nào
+  // Tìm bất kỳ ví nào thuộc về user (ưu tiên ví Vietcombank / bank)
   let wallet = await prisma.wallet.findFirst({
     where: {
       userId,
-      isArchived: false,
       OR: [
         { name: { contains: 'Vietcombank' } },
         { name: { contains: 'VCB' } },
@@ -22,41 +21,62 @@ async function findOrCreateBankWallet(userId: string) {
   });
 
   if (!wallet) {
-    // Tự động tạo Ví Vietcombank nếu user chưa có
+    wallet = await prisma.wallet.findFirst({ where: { userId } });
+  }
+
+  if (!wallet) {
+    try {
+      wallet = await prisma.wallet.create({
+        data: {
+          userId,
+          name: 'Ví Vietcombank',
+          type: 'bank',
+          openingBalance: 0,
+          currentBalance: 0
+        }
+      });
+    } catch {
+      wallet = await prisma.wallet.findFirst({ where: { userId } });
+    }
+  }
+
+  if (!wallet) {
     wallet = await prisma.wallet.create({
       data: {
         userId,
-        name: 'Ví Vietcombank',
+        name: `Ví Ngân Hàng ${Math.floor(Math.random() * 1000)}`,
         type: 'bank',
         openingBalance: 0,
         currentBalance: 0
       }
     });
-    logger.info(`Auto-created 'Ví Vietcombank' for user ${userId}`);
   }
 
   return wallet;
 }
 
-/**
- * Tìm hoặc tự tạo danh mục mặc định cho Thu nhập / Chi tiêu Vietcombank
- */
 async function findOrCreateDefaultCategory(userId: string, type: 'income' | 'expense') {
-  const defaultName = type === 'income' ? 'Thu nhập Ngân hàng' : 'Chi tiêu Ngân hàng';
-
   let category = await prisma.category.findFirst({
-    where: {
-      userId,
-      type,
-      name: defaultName
-    }
+    where: { userId, type }
   });
 
   if (!category) {
-    // Tìm bất kỳ category hợp lệ nào cùng type
-    category = await prisma.category.findFirst({
-      where: { userId, type }
-    });
+    try {
+      category = await prisma.category.create({
+        data: {
+          userId,
+          type,
+          name: type === 'income' ? 'Thu nhập Ngân hàng' : 'Chi tiêu Ngân hàng',
+          isSystem: true
+        }
+      });
+    } catch {
+      category = await prisma.category.findFirst({ where: { userId, type } });
+    }
+  }
+
+  if (!category) {
+    category = await prisma.category.findFirst({ where: { type } });
   }
 
   if (!category) {
@@ -64,7 +84,7 @@ async function findOrCreateDefaultCategory(userId: string, type: 'income' | 'exp
       data: {
         userId,
         type,
-        name: defaultName,
+        name: `Danh mục ${type === 'income' ? 'Thu' : 'Chi'} ${Math.floor(Math.random() * 1000)}`,
         isSystem: true
       }
     });
