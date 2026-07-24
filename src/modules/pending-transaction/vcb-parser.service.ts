@@ -28,7 +28,7 @@ export class VCBParser {
       .replace(/<[^>]+>/g, ' ')
       .replace(/&nbsp;/gi, ' ');
 
-    const normalizedText = cleanText.replace(/\r\n/g, '\n');
+    const normalizedText = cleanText.replace(/\r\n/g, '\n').replace(/\*/g, '');
     const lowers = normalizedText.toLowerCase();
 
     // Check if email is from Vietcombank (contains vietcombank, vcb, or receipt keywords)
