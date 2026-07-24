@@ -91,9 +91,23 @@ export const PendingTransactionService = {
       const match = recipient.match(/sync\+([^@]+)@/);
       let targetUserId = match ? match[1] : null;
 
-      // Nếu truyền kèm userId trong payload hoặc query
+      // Nếu truyền kèm userId hoặc userEmail trong payload
       if (!targetUserId && payload.userId) {
         targetUserId = payload.userId;
+      }
+
+      // Tìm user theo email nếu nhận được từ Google Apps Script / Webhook
+      if (!targetUserId) {
+        const emailInPayload = payload.userEmail || payload.recipient || payload.to || payload.from;
+        if (emailInPayload) {
+          const emailMatch = String(emailInPayload).match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+          if (emailMatch) {
+            const foundUser = await prisma.user.findFirst({
+              where: { email: emailMatch[1] }
+            });
+            if (foundUser) targetUserId = foundUser.id;
+          }
+        }
       }
 
       if (!targetUserId) {
