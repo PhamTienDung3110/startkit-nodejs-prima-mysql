@@ -6,7 +6,19 @@ export const PendingTransactionController = {
   // Public webhook logic (khi email forwarding gọi đến)
   inboundWebhook: async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const payload = req.body;
+      let payload = req.body || {};
+      
+      if (typeof payload === 'string') {
+        try {
+          payload = JSON.parse(payload);
+        } catch {
+          payload = { text: payload };
+        }
+      }
+
+      if (typeof payload !== 'object') {
+        payload = { text: String(payload) };
+      }
       
       const result = await PendingTransactionService.handleInboundEmail(payload);
 
