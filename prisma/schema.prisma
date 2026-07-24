@@ -418,6 +418,7 @@ model PendingTransaction {
   updatedAt DateTime @updatedAt
 
   @@index([userId, status])
+  @@map("pendingtransaction")
 }
 
 // TransactionEntry: bút toán tác động lên ví

@@ -185,17 +185,22 @@ export const PendingTransactionService = {
     );
 
     // 5. Lưu lại lịch sử giao dịch tự động đồng bộ (PendingTransaction -> status: approved)
-    const pendingLog = await prisma.pendingTransaction.create({
-      data: {
-        userId,
-        rawEmailText: rawText,
-        parsedAmount: parsed.amount,
-        parsedType: parsed.type,
-        parsedNote: parsed.note,
-        bankName: parsed.bankName,
-        status: 'approved'
-      }
-    });
+    let pendingLog = null;
+    try {
+      pendingLog = await prisma.pendingTransaction.create({
+        data: {
+          userId,
+          rawEmailText: rawText,
+          parsedAmount: parsed.amount,
+          parsedType: parsed.type,
+          parsedNote: parsed.note,
+          bankName: parsed.bankName,
+          status: 'approved'
+        }
+      });
+    } catch (logErr) {
+      logger.warn(logErr as any, 'Could not create PendingTransaction log entry');
+    }
 
     logger.info(`Auto-created transaction ${newTransaction.id} from Vietcombank email for user ${userId}`);
 
