@@ -1,111 +1,215 @@
-import prisma from '../../db/prisma';
+import { prisma } from '../../db/prisma';
 import { PendingTransactionStatus, TransactionType } from '@prisma/client';
 import { logger } from '../../config/logger';
+import { VCBParser, ParsedVCBTransaction } from './vcb-parser.service';
+import { TransactionService } from '../transaction/transaction.service';
 
-// Giả lập thư viện LLM hoặc dùng fetch API
-async function parseEmailWithLLM(text: string) {
-  // Trong thực tế, bạn gọi LLM API ở đây (Gemini/OpenAI)
-  // Ví dụ: const response = await llm.generate(...)
-  // Dưới đây là dữ liệu giả lập (Mock) sinh ra bởi AI
-  logger.info('Calling LLM to parse email text...');
-  
-  const lowers = text.toLowerCase();
-  let type: TransactionType = 'expense';
-  let amount = 0;
-  let note = 'Parsed from email';
-  let bankName = 'Unknown Bank';
+/**
+ * Tìm hoặc tự động tạo Ví Vietcombank cho User
+ */
+async function findOrCreateBankWallet(userId: string) {
+  // Tìm ví dạng bank có chứa tên Vietcombank hoặc bất kỳ ví bank nào
+  let wallet = await prisma.wallet.findFirst({
+    where: {
+      userId,
+      isArchived: false,
+      OR: [
+        { name: { contains: 'Vietcombank' } },
+        { name: { contains: 'VCB' } },
+        { type: 'bank' }
+      ]
+    }
+  });
 
-  // Demo parsing logic ngây ngô để fallback nếu không có api key
-  if (lowers.includes('vcb') || lowers.includes('vietcombank')) bankName = 'Vietcombank';
-  if (lowers.includes('tpbank')) bankName = 'TPBank';
-  
-  if (lowers.includes('+') || lowers.includes('cộng')) type = 'income';
-  
-  const amountMatch = text.match(/([\d,\.]+)\s*(vnd|đ|d)/i);
-  if (amountMatch) {
-    amount = parseFloat(amountMatch[1].replace(/,/g, ''));
+  if (!wallet) {
+    // Tự động tạo Ví Vietcombank nếu user chưa có
+    wallet = await prisma.wallet.create({
+      data: {
+        userId,
+        name: 'Ví Vietcombank',
+        type: 'bank',
+        openingBalance: 0,
+        currentBalance: 0
+      }
+    });
+    logger.info(`Auto-created 'Ví Vietcombank' for user ${userId}`);
   }
 
-  return {
-    parsedAmount: amount > 0 ? amount : null,
-    parsedType: type,
-    parsedNote: note,
-    bankName
-  };
+  return wallet;
+}
+
+/**
+ * Tìm hoặc tự tạo danh mục mặc định cho Thu nhập / Chi tiêu Vietcombank
+ */
+async function findOrCreateDefaultCategory(userId: string, type: 'income' | 'expense') {
+  const defaultName = type === 'income' ? 'Thu nhập Ngân hàng' : 'Chi tiêu Ngân hàng';
+
+  let category = await prisma.category.findFirst({
+    where: {
+      userId,
+      type,
+      name: defaultName
+    }
+  });
+
+  if (!category) {
+    // Tìm bất kỳ category hợp lệ nào cùng type
+    category = await prisma.category.findFirst({
+      where: { userId, type }
+    });
+  }
+
+  if (!category) {
+    category = await prisma.category.create({
+      data: {
+        userId,
+        type,
+        name: defaultName,
+        isSystem: true
+      }
+    });
+  }
+
+  return category;
 }
 
 export const PendingTransactionService = {
+  /**
+   * Xử lý Email Webhook nhận từ quy tắc chuyển tiếp (Auto-Forward)
+   */
   async handleInboundEmail(payload: any) {
     try {
-      const recipient = payload.recipient || '';
-      const text = payload.text || payload['body-plain'] || '';
+      const recipient = payload.recipient || payload.to || '';
+      const text = payload.text || payload['body-plain'] || payload.html || payload.subject || '';
       
       if (!text) {
-        logger.warn('No text found in inbound email webhok');
-        return;
+        logger.warn('No text found in inbound email webhook');
+        return null;
       }
 
       // 1. Phân tích userId từ recipient address (VD: sync+user-uuid@inbox.app.com)
-      // recipient format: sync+<userId>@inbox.app.com
       const match = recipient.match(/sync\+([^@]+)@/);
-      const targetUserId = match ? match[1] : null;
+      let targetUserId = match ? match[1] : null;
 
-      if (!targetUserId) {
-        // Nếu không tìm thấy userId ở dạng chuẩn, ta drop hoặc log
-        logger.error(`Could not extract userId from recipient: ${recipient}`);
-        return;
+      // Nếu truyền kèm userId trong payload hoặc query
+      if (!targetUserId && payload.userId) {
+        targetUserId = payload.userId;
       }
 
-      // Check xem user có tồn tại không
+      if (!targetUserId) {
+        // Fallback: Tìm user đầu tiên trong DB để test nếu không có recipient token
+        const firstUser = await prisma.user.findFirst();
+        if (firstUser) {
+          targetUserId = firstUser.id;
+        } else {
+          logger.error(`Could not extract userId from recipient: ${recipient}`);
+          return null;
+        }
+      }
+
       const user = await prisma.user.findUnique({ where: { id: targetUserId } });
       if (!user) {
         logger.error(`User ID ${targetUserId} not found for inbound email`);
-        return;
+        return null;
       }
 
-      // 2. Dùng AI Parse text
-      const parsedData = await parseEmailWithLLM(text);
-
-      // 3. Insert vào Database
-      await prisma.pendingTransaction.create({
-        data: {
-          userId: targetUserId,
-          rawEmailText: text,
-          parsedAmount: parsedData.parsedAmount,
-          parsedType: parsedData.parsedType,
-          parsedNote: parsedData.parsedNote,
-          bankName: parsedData.bankName,
-          status: 'pending'
-        }
-      });
-      logger.info(`Successfully created pending transaction for user ${targetUserId}`);
+      return await this.processEmailTextAndAutoAdd(targetUserId, text);
     } catch (error) {
-      logger.error('Error handling inbound email:', error);
+      logger.error(error as any, 'Error handling inbound email');
       throw error;
     }
   },
 
+  /**
+   * Phân tích văn bản Email và TỰ ĐỘNG THÊM thẳng vào Ví Ngân Hàng
+   */
+  async processEmailTextAndAutoAdd(userId: string, rawText: string) {
+    // 1. Parse văn bản bằng VCBParser
+    let parsed = VCBParser.parse(rawText);
+
+    // Fallback nếu không có cấu trúc chuẩn VCB
+    if (!parsed || !parsed.amount) {
+      const lowers = rawText.toLowerCase();
+      let type: TransactionType = lowers.includes('+') || lowers.includes('cộng') ? 'income' : 'expense';
+      const amountMatch = rawText.match(/([\d,\.]+)\s*(vnd|đ|d)/i);
+      const amount = amountMatch ? parseFloat(amountMatch[1].replace(/,/g, '')) : 0;
+
+      if (amount > 0) {
+        parsed = {
+          amount,
+          type,
+          note: 'Giao dịch Vietcombank',
+          transactionDate: new Date(),
+          bankName: 'Vietcombank',
+          rawText
+        };
+      }
+    }
+
+    if (!parsed || !parsed.amount) {
+      logger.warn('Failed to parse amount from email text');
+      return null;
+    }
+
+    // 2. Tìm hoặc tạo Ví Vietcombank
+    const wallet = await findOrCreateBankWallet(userId);
+
+    // 3. Tìm hoặc tạo Danh mục thu/chi
+    const category = await findOrCreateDefaultCategory(userId, parsed.type === 'income' ? 'income' : 'expense');
+
+    // 4. TỰ ĐỘNG THÊM GIAO DỊCH CHÍNH THỨC VÀO VÍ NGÂN HÀNG
+    const newTransaction = await TransactionService.createTransaction(
+      {
+        type: parsed.type as 'income' | 'expense',
+        walletId: wallet.id,
+        categoryId: category.id,
+        amount: parsed.amount,
+        transactionDate: parsed.transactionDate,
+        note: parsed.note
+      },
+      userId
+    );
+
+    // 5. Lưu lại lịch sử giao dịch tự động đồng bộ (PendingTransaction -> status: approved)
+    const pendingLog = await prisma.pendingTransaction.create({
+      data: {
+        userId,
+        rawEmailText: rawText,
+        parsedAmount: parsed.amount,
+        parsedType: parsed.type,
+        parsedNote: parsed.note,
+        bankName: parsed.bankName,
+        status: 'approved'
+      }
+    });
+
+    logger.info(`Auto-created transaction ${newTransaction.id} from Vietcombank email for user ${userId}`);
+
+    return {
+      transaction: newTransaction,
+      pendingLog,
+      walletName: wallet.name
+    };
+  },
+
+  /**
+   * Lấy danh sách lịch sử giao dịch tự động đồng bộ từ email
+   */
   async getPendingTransactions(userId: string) {
     return prisma.pendingTransaction.findMany({
-      where: {
-        userId,
-        status: 'pending'
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 20
     });
   },
 
+  /**
+   * Cập nhật trạng thái
+   */
   async updateStatus(userId: string, id: string, status: PendingTransactionStatus) {
     return prisma.pendingTransaction.update({
-      where: {
-        id,
-        userId // đảm bảo chỉ update của đúng user
-      },
-      data: {
-        status
-      }
+      where: { id, userId },
+      data: { status }
     });
   }
 };

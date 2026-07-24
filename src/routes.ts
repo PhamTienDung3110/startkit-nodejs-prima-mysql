@@ -45,6 +45,7 @@ routes.get('/users', requireAuth, requireRole(['ADMIN']), UsersController.list);
 
 // ========== Transaction Routes ==========
 routes.get('/transactions/pending', requireAuth, PendingTransactionController.getPendingTransactions);
+routes.post('/transactions/pending/test-email', requireAuth, PendingTransactionController.testEmail);
 routes.patch('/transactions/pending/:id/status', requireAuth, validateBody(updatePendingTransactionSchema), PendingTransactionController.updateStatus);
 routes.post('/transactions', requireAuth, validateBody(createTransactionSchema), TransactionController.createTransaction);
 routes.get('/transactions', requireAuth, TransactionController.getTransactions);
