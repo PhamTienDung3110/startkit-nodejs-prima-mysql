@@ -8,54 +8,45 @@ import { TransactionService } from '../transaction/transaction.service';
  * Tìm hoặc tự động tạo Ví Vietcombank cho User
  */
 async function findOrCreateBankWallet(userId: string) {
-  // 1. Ưu tiên tìm ví ACTIVE (isArchived: false) có chứa tên Vietcombank / VCB / bank
+  // 1. Tự động bỏ Ẩn ví 'VCB' nếu đang bị Archived
+  const archivedVcb = await prisma.wallet.findFirst({
+    where: { userId, name: { equals: 'VCB' } }
+  });
+  if (archivedVcb && archivedVcb.isArchived) {
+    await prisma.wallet.update({
+      where: { id: archivedVcb.id },
+      data: { isArchived: false }
+    });
+  }
+
+  // 2. Tìm ví ACTIVE có tên VCB / Vietcombank / type bank
   let wallet = await prisma.wallet.findFirst({
     where: {
       userId,
       isArchived: false,
       OR: [
-        { name: { contains: 'Vietcombank' } },
+        { name: { equals: 'VCB' } },
         { name: { contains: 'VCB' } },
+        { name: { contains: 'Vietcombank' } },
         { type: 'bank' }
       ]
     }
   });
 
-  // 2. Nếu không thấy ví bank active, tìm bất kỳ ví ACTIVE nào thuộc về user
+  // 3. Nếu không có ví bank active, lấy bất kỳ ví ACTIVE nào thuộc về user
   if (!wallet) {
     wallet = await prisma.wallet.findFirst({
       where: { userId, isArchived: false }
     });
   }
 
-  // 3. Nếu không thấy ví active nào, thử unarchive một ví ngân hàng cũ
-  if (!wallet) {
-    const archivedWallet = await prisma.wallet.findFirst({
-      where: {
-        userId,
-        OR: [
-          { name: { contains: 'Vietcombank' } },
-          { name: { contains: 'VCB' } },
-          { type: 'bank' }
-        ]
-      }
-    });
-
-    if (archivedWallet) {
-      wallet = await prisma.wallet.update({
-        where: { id: archivedWallet.id },
-        data: { isArchived: false }
-      });
-    }
-  }
-
-  // 4. Tự động tạo Ví Vietcombank mới nếu user chưa có ví active
+  // 4. Nếu chưa có ví, tự động tạo mới Ví 'VCB'
   if (!wallet) {
     try {
       wallet = await prisma.wallet.create({
         data: {
           userId,
-          name: 'Ví Vietcombank',
+          name: 'VCB',
           type: 'bank',
           openingBalance: 0,
           currentBalance: 0,
@@ -66,7 +57,7 @@ async function findOrCreateBankWallet(userId: string) {
       wallet = await prisma.wallet.create({
         data: {
           userId,
-          name: `Ví Vietcombank ${Math.floor(Math.random() * 1000)}`,
+          name: `VCB ${Math.floor(Math.random() * 1000)}`,
           type: 'bank',
           openingBalance: 0,
           currentBalance: 0,
