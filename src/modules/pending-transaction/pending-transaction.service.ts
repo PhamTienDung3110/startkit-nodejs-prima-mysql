@@ -70,19 +70,86 @@ async function findOrCreateBankWallet(userId: string) {
   return wallet;
 }
 
-async function findOrCreateDefaultCategory(userId: string, type: 'income' | 'expense') {
+async function findOrCreateSmartCategory(userId: string, type: 'income' | 'expense', note: string = '') {
+  const lowerNote = note.toLowerCase();
+
+  let targetName = type === 'income' ? 'Thu nhập Ngân hàng' : 'Chi tiêu Vietcombank';
+  let targetIcon = type === 'income' ? 'wallet' : 'credit-card';
+
+  // Quy tắc từ khóa tự động phân loại danh mục
+  if (lowerNote.includes('pipi')) {
+    targetName = 'Pipi';
+    targetIcon = 'heart';
+  } else if (
+    lowerNote.includes('an') ||
+    lowerNote.includes('com') ||
+    lowerNote.includes('pho') ||
+    lowerNote.includes('bun') ||
+    lowerNote.includes('ca phe') ||
+    lowerNote.includes('cf') ||
+    lowerNote.includes('coffee') ||
+    lowerNote.includes('tra sua') ||
+    lowerNote.includes('food')
+  ) {
+    targetName = 'Ăn uống';
+    targetIcon = 'utensils';
+  } else if (
+    lowerNote.includes('xang') ||
+    lowerNote.includes('grab') ||
+    lowerNote.includes('be') ||
+    lowerNote.includes('gojek') ||
+    lowerNote.includes('taxi') ||
+    lowerNote.includes('ve xe')
+  ) {
+    targetName = 'Di chuyển';
+    targetIcon = 'car';
+  } else if (
+    lowerNote.includes('dien') ||
+    lowerNote.includes('nuoc') ||
+    lowerNote.includes('wifi') ||
+    lowerNote.includes('internet') ||
+    lowerNote.includes('cuoc') ||
+    lowerNote.includes('hoa don')
+  ) {
+    targetName = 'Hóa đơn & Dịch vụ';
+    targetIcon = 'receipt';
+  } else if (
+    lowerNote.includes('mua') ||
+    lowerNote.includes('shopper') ||
+    lowerNote.includes('lazada') ||
+    lowerNote.includes('tiki') ||
+    lowerNote.includes('sieu thi') ||
+    lowerNote.includes('mart')
+  ) {
+    targetName = 'Mua sắm';
+    targetIcon = 'shopping-bag';
+  } else if (type === 'income' && (lowerNote.includes('luong') || lowerNote.includes('thuong') || lowerNote.includes('nhan tien'))) {
+    targetName = 'Lương';
+    targetIcon = 'wallet';
+  }
+
+  // 1. Tìm danh mục chính xác theo tên targetName của user
   let category = await prisma.category.findFirst({
-    where: { userId, type }
+    where: { userId, type, name: targetName }
   });
 
+  // 2. Tìm danh mục chứa tên targetName của user
+  if (!category) {
+    category = await prisma.category.findFirst({
+      where: { userId, type, name: { contains: targetName } }
+    });
+  }
+
+  // 3. Nếu chưa có, tự động tạo mới danh mục này cho user
   if (!category) {
     try {
       category = await prisma.category.create({
         data: {
           userId,
           type,
-          name: type === 'income' ? 'Thu nhập Ngân hàng' : 'Chi tiêu Ngân hàng',
-          isSystem: true
+          name: targetName,
+          icon: targetIcon,
+          isSystem: false
         }
       });
     } catch {
@@ -90,16 +157,23 @@ async function findOrCreateDefaultCategory(userId: string, type: 'income' | 'exp
     }
   }
 
+  // 4. Fallback: Lấy bất kỳ danh mục nào hợp lệ của user cùng loại (thu/chi)
+  if (!category) {
+    category = await prisma.category.findFirst({ where: { userId, type } });
+  }
+
   if (!category) {
     category = await prisma.category.findFirst({ where: { type } });
   }
 
+  // 5. Ultimate fallback: Tạo danh mục mặc định
   if (!category) {
     category = await prisma.category.create({
       data: {
         userId,
         type,
-        name: `Danh mục ${type === 'income' ? 'Thu' : 'Chi'} ${Math.floor(Math.random() * 1000)}`,
+        name: targetName,
+        icon: targetIcon,
         isSystem: true
       }
     });
@@ -203,8 +277,8 @@ export const PendingTransactionService = {
     // 2. Tìm hoặc tạo Ví Vietcombank
     const wallet = await findOrCreateBankWallet(userId);
 
-    // 3. Tìm hoặc tạo Danh mục thu/chi
-    const category = await findOrCreateDefaultCategory(userId, parsed.type === 'income' ? 'income' : 'expense');
+    // 3. Tìm hoặc tạo Danh mục thu/chi thông minh theo từ khóa (bao gồm pipi, ăn uống, di chuyển, hóa đơn...)
+    const category = await findOrCreateSmartCategory(userId, parsed.type === 'income' ? 'income' : 'expense', parsed.note);
 
     // 4. TỰ ĐỘNG THÊM GIAO DỊCH CHÍNH THỨC VÀO VÍ NGÂN HÀNG
     const newTransaction = await TransactionService.createTransaction(
