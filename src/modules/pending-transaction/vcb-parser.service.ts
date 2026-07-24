@@ -17,7 +17,18 @@ export class VCBParser {
   public static parse(text: string): ParsedVCBTransaction | null {
     if (!text || typeof text !== 'string') return null;
 
-    const normalizedText = text.replace(/\r\n/g, '\n');
+    // Strip HTML tags if HTML format is passed
+    const cleanText = text
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<tr[^>]*>/gi, '\n')
+      .replace(/<td[^>]*>/gi, '\t')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/p>/gi, '\n')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/gi, ' ');
+
+    const normalizedText = cleanText.replace(/\r\n/g, '\n');
     const lowers = normalizedText.toLowerCase();
 
     // Check if email is from Vietcombank (contains vietcombank, vcb, or receipt keywords)
