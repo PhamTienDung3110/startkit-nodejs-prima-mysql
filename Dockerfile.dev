@@ -1,0 +1,22 @@
+FROM node:20-alpine
+
+RUN apk add --no-cache tzdata
+ENV TZ=Asia/Ho_Chi_Minh
+
+WORKDIR /app
+
+# Install dependencies (baked into image để không cần npm install mỗi lần start)
+COPY package*.json ./
+COPY prisma ./prisma/
+RUN npm ci
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# Copy source code
+COPY . .
+
+EXPOSE 3001
+
+# Migrate + start dev server với hot-reload
+CMD ["sh", "-c", "npx prisma migrate deploy && npm run dev"]
