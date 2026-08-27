@@ -23,6 +23,8 @@ import { GoalController } from './modules/goal/goal.controller';
 import { createGoalSchema, updateGoalSchema, createMilestoneSchema, updateMilestoneSchema } from './modules/goal/goal.schema';
 import { PendingTransactionController } from './modules/pending-transaction/pending-transaction.controller';
 import { updatePendingTransactionSchema } from './modules/pending-transaction/pending-transaction.schema';
+import { NoteController } from './modules/note/note.controller';
+import { createNotebookSchema, updateNotebookSchema, createSessionSchema, updateSessionSchema } from './modules/note/note.schema';
 
 // Tạo router instance để định nghĩa các routes
 export const routes = Router();
@@ -104,3 +106,16 @@ routes.delete('/goals/milestones/:id', requireAuth, GoalController.deleteMilesto
 
 // ========== Webhooks Routes ==========
 routes.post('/webhooks/email-inbound', PendingTransactionController.inboundWebhook);
+
+// ========== Note / Learning Journal Routes ==========
+// NoteBook (Khóa học)
+routes.get('/notebooks',     requireAuth, NoteController.getNotebooks);
+routes.post('/notebooks',    requireAuth, validateBody(createNotebookSchema), NoteController.createNotebook);
+routes.put('/notebooks/:id', requireAuth, validateBody(updateNotebookSchema), NoteController.updateNotebook);
+routes.delete('/notebooks/:id', requireAuth, NoteController.deleteNotebook);
+// Sessions của một notebook
+routes.get('/notebooks/:notebookId/sessions', requireAuth, NoteController.getSessions);
+// NoteSession (Buổi học)
+routes.post('/note-sessions',    requireAuth, validateBody(createSessionSchema), NoteController.createSession);
+routes.put('/note-sessions/:id', requireAuth, validateBody(updateSessionSchema), NoteController.updateSession);
+routes.delete('/note-sessions/:id', requireAuth, NoteController.deleteSession);

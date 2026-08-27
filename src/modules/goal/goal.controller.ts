@@ -213,7 +213,21 @@ export const GoalController = {
         return res.status(401).json({ message: 'Unauthorized' });
       }
 
-      const result = await GoalService.getGoals(userId, req.query as any);
+      // req.query values are always strings — parse numerics explicitly
+      const q = req.query as Record<string, string | undefined>;
+      const parsed = {
+        periodType:   q.periodType as any,
+        status:       q.status as any,
+        priority:     q.priority as any,
+        category:     q.category as any,
+        parentGoalId: q.parentGoalId,
+        year:   q.year  ? parseInt(q.year,  10) || undefined : undefined,
+        month:  q.month ? parseInt(q.month, 10) || undefined : undefined,
+        limit:  q.limit ? Math.min(100, Math.max(1, parseInt(q.limit, 10) || 50)) : 50,
+        offset: q.offset ? Math.max(0, parseInt(q.offset, 10) || 0) : 0,
+      };
+
+      const result = await GoalService.getGoals(userId, parsed);
       return res.status(200).json({
         message: 'Goals retrieved successfully',
         ...result,
@@ -222,6 +236,7 @@ export const GoalController = {
       return handleGoalError(e, res);
     }
   },
+
 
   /**
    * Lấy goal theo ID

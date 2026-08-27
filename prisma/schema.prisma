@@ -166,6 +166,10 @@ model User {
   // 1 user có nhiều giao dịch nháp (từ email/sms)
   pendingTransactions PendingTransaction[]
 
+  // 1 user có nhiều khóa học (ghi chú học tập)
+  notebooks    NoteBook[]
+  noteSessions NoteSession[]
+
   // Timestamps
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -692,3 +696,65 @@ model Milestone {
   @@index([goalId, order])
   @@index([goalId, isCompleted])
 }
+
+// =========================
+// NOTE / LEARNING JOURNAL
+// =========================
+
+// NoteBook: Khóa học / môn học (VD: JLPT N3, JavaScript, Python)
+model NoteBook {
+  id          String  @id @default(uuid())
+
+  // FK -> User
+  userId      String
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Thông tin khóa học
+  name        String                    // Tên khóa học
+  emoji       String  @default("📘")   // Biểu tượng
+  color       String  @default("violet") // Màu sắc (key string)
+  description String? @db.Text
+
+  // Sort order cho UI
+  sortOrder   Int     @default(0)
+
+  // 1 NoteBook có nhiều sessions
+  sessions    NoteSession[]
+
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, sortOrder])
+  @@map("notebook")
+}
+
+// NoteSession: Buổi học trong một NoteBook
+model NoteSession {
+  id            String   @id @default(uuid())
+
+  // FK -> NoteBook
+  notebookId    String
+  notebook      NoteBook @relation(fields: [notebookId], references: [id], onDelete: Cascade)
+
+  // FK -> User (để query trực tiếp, tránh join qua NoteBook)
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Thông tin buổi học
+  sessionNumber Int                      // Số thứ tự buổi học (1, 2, 3...)
+  title         String                   // Tiêu đề buổi học
+  date          String                   // Ngày học "YYYY-MM-DD"
+  contentHtml   String  @db.LongText     // Nội dung HTML (Notion-like)
+  tags          String  @default("[]") @db.Text // JSON array: ["tag1","tag2"]
+
+  // Timestamps
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([notebookId, sessionNumber])
+  @@index([userId, notebookId])
+  @@index([userId, updatedAt])
+  @@map("notesession")
+}
+
