@@ -52,7 +52,7 @@ CREATE TABLE `notesession` (
     `title` VARCHAR(191) NOT NULL,
     `date` VARCHAR(191) NOT NULL,
     `contentHtml` LONGTEXT NOT NULL,
-    `tags` TEXT NOT NULL DEFAULT '[]',
+    `tags` VARCHAR(1000) NOT NULL DEFAULT '[]',
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 

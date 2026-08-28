@@ -746,7 +746,7 @@ model NoteSession {
   title         String                   // Tiêu đề buổi học
   date          String                   // Ngày học "YYYY-MM-DD"
   contentHtml   String  @db.LongText     // Nội dung HTML (Notion-like)
-  tags          String  @default("[]") @db.Text // JSON array: ["tag1","tag2"]
+  tags          String  @default("[]") @db.VarChar(1000) // JSON array: ["tag1","tag2"]
 
   // Timestamps
   createdAt     DateTime @default(now())
