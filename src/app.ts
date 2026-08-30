@@ -34,7 +34,7 @@ export function createApp() {
   app.use(cors({
     credentials: true,
     origin: (origin, callback) => {
-      // Cho phép curl / server-to-server
+      // Cho phép curl / server-to-server (no origin)
       if (!origin) return callback(null, true);
 
       if (
@@ -51,6 +51,7 @@ export function createApp() {
     },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'Pragma', 'X-Requested-With', 'Accept'],
+    exposedHeaders: ['Content-Type', 'Authorization'],
   }));
 
 
