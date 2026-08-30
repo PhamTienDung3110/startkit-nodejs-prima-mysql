@@ -19,4 +19,4 @@ COPY . .
 EXPOSE 3001
 
 # Auto db push schema & start dev server with hot-reload
-CMD ["sh", "-c", "npx prisma db push --skip-generate && npm run dev"]
+CMD ["sh", "-c", "npx prisma db push && npm run dev"]
