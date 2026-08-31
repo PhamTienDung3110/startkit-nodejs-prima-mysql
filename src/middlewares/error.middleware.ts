@@ -18,11 +18,18 @@ const allowedOrigins = (process.env.CORS_ORIGIN || '')
  */
 function setCorsHeaders(req: Request, res: Response): void {
   const origin = req.get('Origin');
-  if (origin && (allowedOrigins.length === 0 || allowedOrigins.includes(origin))) {
+  const isAllowed =
+    !origin ||
+    allowedOrigins.includes(origin) ||
+    origin.startsWith('http://localhost:') ||
+    origin.startsWith('http://127.0.0.1:') ||
+    origin.endsWith('.vercel.app');
+
+  if (origin && isAllowed) {
     res.setHeader('Access-Control-Allow-Origin', origin);
   }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cache-Control, Pragma, X-Requested-With, Accept');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
 }
 
