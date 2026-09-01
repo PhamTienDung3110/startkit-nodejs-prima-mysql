@@ -47,6 +47,10 @@ RUN npm ci --omit=dev && npx prisma generate
 # Copy built files
 COPY --from=builder /app/dist ./dist
 
+# Copy entrypoint script
+COPY entrypoint.sh ./entrypoint.sh
+RUN chmod +x ./entrypoint.sh
+
 EXPOSE 3001
 
-CMD ["node", "dist/src/server.js"]
+ENTRYPOINT ["sh", "entrypoint.sh"]
