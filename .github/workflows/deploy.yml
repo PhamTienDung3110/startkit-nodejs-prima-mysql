@@ -1,0 +1,32 @@
+name: Deploy Backend to VPS
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          script: |
+            cd /var/www/startkit-nodejs-prima-mysql
+
+            echo "📥 Pulling latest code..."
+            git pull origin main
+
+            echo "🐳 Rebuilding Docker backend..."
+            docker compose -f docker-compose.prod.yml up --build -d backend
+
+            echo "🔍 Checking container status..."
+            docker compose -f docker-compose.prod.yml ps
+
+            echo "✅ Deploy done!"
