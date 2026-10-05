@@ -758,3 +758,50 @@ model NoteSession {
   @@map("notesession")
 }
 
+// =========================
+// DICTIONARY / VOCABULARY
+// =========================
+
+// DictionaryWord: Lưu trữ từ điển tra cứu từ Oxford + dịch nghĩa (Cache-aside)
+model DictionaryWord {
+  id          String   @id @default(uuid())
+  word        String   @unique @db.VarChar(191) // Từ tiếng Anh chuẩn hóa (lowercase)
+  phoneticUk  String?  @db.VarChar(191)
+  phoneticUs  String?  @db.VarChar(191)
+  audioUk     String?  @db.VarChar(500)
+  audioUs     String?  @db.VarChar(500)
+  data        Json     // Dữ liệu ApiResponse đầy đủ (tabs.en_en, tabs.en_vi, synonyms,...)
+  source      String   @default("Oxford Learner's Dictionaries") @db.VarChar(100)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([word])
+  @@map("dictionary_word")
+}
+
+// UserVocabulary: Sổ tay từ vựng của người dùng để học và ôn tập Spaced Repetition (SRS)
+model UserVocabulary {
+  id                 String    @id @default(uuid())
+  userId             String    @default("default_user") @db.VarChar(191)
+  word               String    @db.VarChar(191)
+  meaning            String    @db.Text
+  phonetics          String?   @db.VarChar(191)
+  audioUrl           String?   @db.VarChar(500)
+  level              Int       @default(1)
+  correctCount       Int       @default(0)
+  totalAttempts      Int       @default(0)
+  consecutiveCorrect Int       @default(0)
+  consecutiveWrong   Int       @default(0)
+  nextReview         DateTime  @default(now())
+  lastStudied        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@unique([userId, word])
+  @@index([userId])
+  @@index([word])
+  @@index([nextReview])
+  @@map("user_vocabulary")
+}
+
+

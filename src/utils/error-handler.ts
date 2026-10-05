@@ -86,6 +86,10 @@ export const ErrorMap: Record<string, ErrorResponse> = {
   CONNECTION_ERROR: { status: 500, message: 'Connection error' },
   P2021: { status: 503, message: 'Table does not exist. Run: npx prisma migrate deploy in LE-backend' },
 
+  // Dictionary Errors
+  WORD_NOT_FOUND: { status: 404, message: 'Word not found in Oxford dictionary' },
+  DICTIONARY_LOOKUP_FAILED: { status: 502, message: 'Failed to fetch dictionary data from Oxford' },
+
   // Generic Errors
   INTERNAL_SERVER_ERROR: { status: 500, message: 'Internal server error' }
 };

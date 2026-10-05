@@ -4,7 +4,7 @@
  */
 import { Router } from 'express';
 import { validateBody } from './middlewares/validate.middleware';
-import { requireAuth, requireRole } from './middlewares/auth.middleware';
+import { requireAuth, requireRole, optionalAuth } from './middlewares/auth.middleware';
 
 import { AuthController } from './modules/auth/auth.controller';
 import { registerSchema, loginSchema, refreshSchema } from './modules/auth/auth.schema';
@@ -25,6 +25,8 @@ import { PendingTransactionController } from './modules/pending-transaction/pend
 import { updatePendingTransactionSchema } from './modules/pending-transaction/pending-transaction.schema';
 import { NoteController } from './modules/note/note.controller';
 import { createNotebookSchema, updateNotebookSchema, createSessionSchema, updateSessionSchema } from './modules/note/note.schema';
+import { DictionaryController } from './modules/dictionary/dictionary.controller';
+import { VocabularyController } from './modules/vocabulary/vocabulary.controller';
 
 // Tạo router instance để định nghĩa các routes
 export const routes = Router();
@@ -119,3 +121,16 @@ routes.get('/notebooks/:notebookId/sessions', requireAuth, NoteController.getSes
 routes.post('/note-sessions',    requireAuth, validateBody(createSessionSchema), NoteController.createSession);
 routes.put('/note-sessions/:id', requireAuth, validateBody(updateSessionSchema), NoteController.updateSession);
 routes.delete('/note-sessions/:id', requireAuth, NoteController.deleteSession);
+
+// ========== Dictionary / Vocabulary Routes ==========
+routes.get('/dictionary/lookup', DictionaryController.lookup);
+routes.get('/dictionary/suggestions', DictionaryController.getSuggestions);
+routes.get('/dictionary/popular', DictionaryController.getPopular);
+
+// User Vocabulary notebook & Spaced Repetition (SRS)
+routes.get('/vocabulary', optionalAuth, VocabularyController.getWords);
+routes.post('/vocabulary', optionalAuth, VocabularyController.addWord);
+routes.put('/vocabulary/:id', optionalAuth, VocabularyController.updateWord);
+routes.delete('/vocabulary/:id', optionalAuth, VocabularyController.deleteWord);
+routes.post('/vocabulary/:id/learn', optionalAuth, VocabularyController.markLearned);
+

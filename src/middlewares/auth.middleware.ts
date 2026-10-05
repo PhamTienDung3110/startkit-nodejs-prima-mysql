@@ -31,6 +31,24 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction) => 
 };
 
 /**
+ * Middleware xác thực tùy chọn (optional)
+ * Nếu có token hợp lệ -> gắn req.user
+ * Nếu không có token -> vẫn cho phép tiếp tục (dùng default_user)
+ */
+export const optionalAuth = (req: Request, res: Response, next: NextFunction) => {
+  const header = req.headers.authorization;
+  if (header?.startsWith('Bearer ')) {
+    const token = header.slice('Bearer '.length);
+    try {
+      req.user = verifyAccessToken(token);
+    } catch {
+      // bỏ qua lỗi token để không block request
+    }
+  }
+  next();
+};
+
+/**
  * Middleware yêu cầu role cụ thể (authorization)
  * Phải được sử dụng sau requireAuth để đảm bảo req.user đã được set
  * Kiểm tra xem user có role phù hợp không
