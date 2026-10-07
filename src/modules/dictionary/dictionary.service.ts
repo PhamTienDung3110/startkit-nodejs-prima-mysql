@@ -1,6 +1,7 @@
 import { prisma } from '../../db/prisma';
 import { OxfordService } from './oxford.service';
 import { TranslateService } from './translate.service';
+import { EvdictService } from './evdict.service';
 import { ApiResponse, DictionarySuggestion } from './dictionary.types';
 import { logger } from '../../config/logger';
 
@@ -9,7 +10,7 @@ export class DictionaryService {
    * Lookup a word:
    * 1. Check if word exists in database (Cache hit)
    * 2. If not, scrape Oxford Learner's Dictionary
-   * 3. Translate to Vietnamese (definitions & examples)
+   * 3. Translate to Vietnamese (definitions & examples with concise EVdict meanings)
    * 4. Save to database for subsequent lookups
    * 5. Return structured ApiResponse
    */
@@ -25,12 +26,18 @@ export class DictionaryService {
     });
 
     if (existing) {
-      logger.info({ word }, 'Dictionary cache hit from database');
       const cachedData = existing.data as unknown as ApiResponse;
-      return {
-        ...cachedData,
-        fromCache: true,
-      };
+      // If cached data was created before the concise meaning upgrade (lacks primary_meaning), refresh it
+      if (!cachedData.entry?.primary_meaning) {
+        logger.info({ word }, 'Old cache format detected. Refreshing with concise definitions...');
+        await prisma.dictionaryWord.delete({ where: { word } }).catch(() => {});
+      } else {
+        logger.info({ word }, 'Dictionary cache hit from database');
+        return {
+          ...cachedData,
+          fromCache: true,
+        };
+      }
     }
 
     // 2. Fetch from Oxford Learner's Dictionaries
@@ -41,7 +48,7 @@ export class DictionaryService {
       throw new Error('WORD_NOT_FOUND');
     }
 
-    // 3. Translate definitions and examples to Vietnamese
+    // 3. Translate definitions and examples to Vietnamese (incorporating concise everyday meanings)
     const apiResponse = await TranslateService.transformToApiResponse(oxfordEntries);
 
     // 4. Save to Database
@@ -70,7 +77,7 @@ export class DictionaryService {
   }
 
   /**
-   * Get suggestions combining Database + Oxford Autocomplete
+   * Get suggestions combining Database + Oxford Autocomplete + EVdict
    */
   static async getSuggestions(query: string): Promise<DictionarySuggestion[]> {
     const cleanQuery = query.trim().toLowerCase();
@@ -87,7 +94,7 @@ export class DictionaryService {
           word: item.word,
           inDb: true,
           pos: data.tabs?.en_vi?.part_of_speech?.[0]?.pos,
-          meaning: data.tabs?.en_vi?.part_of_speech?.[0]?.senses?.[0]?.vn_meaning,
+          meaning: data.entry?.primary_meaning || data.tabs?.en_vi?.part_of_speech?.[0]?.senses?.[0]?.vn_meaning,
           phonetics: item.phoneticUk || item.phoneticUs,
           fullData: data,
         };
@@ -111,7 +118,7 @@ export class DictionaryService {
         word: item.word,
         inDb: true,
         pos: data.tabs?.en_vi?.part_of_speech?.[0]?.pos,
-        meaning: data.tabs?.en_vi?.part_of_speech?.[0]?.senses?.[0]?.vn_meaning,
+        meaning: data.entry?.primary_meaning || data.tabs?.en_vi?.part_of_speech?.[0]?.senses?.[0]?.vn_meaning,
         phonetics: item.phoneticUk || item.phoneticUs,
         fullData: data,
       };
@@ -126,9 +133,13 @@ export class DictionaryService {
         const lower = extWord.toLowerCase();
         if (!existingWordSet.has(lower) && suggestions.length < 10) {
           existingWordSet.add(lower);
+          const evMatch = EvdictService.lookup(lower);
           suggestions.push({
             word: extWord,
             inDb: false,
+            pos: evMatch?.posList[0]?.pos,
+            meaning: evMatch?.primaryMeaning ? EvdictService.capitalize(evMatch.primaryMeaning) : undefined,
+            phonetics: evMatch?.phonetics ? `/${evMatch.phonetics}/` : undefined,
           });
         }
       }
@@ -153,6 +164,6 @@ export class DictionaryService {
       return words.map((w: any) => w.word);
     }
 
-    return ['resilient', 'follow', 'beautiful', 'important', 'technology', 'success'];
+    return ['resilient', 'table', 'beautiful', 'important', 'technology', 'success'];
   }
 }

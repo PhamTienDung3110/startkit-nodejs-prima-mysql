@@ -15,6 +15,7 @@ export interface ApiViExample {
 
 export interface ApiViSense {
   vn_meaning: string;
+  def_detail?: string;
   examples: ApiViExample[];
 }
 
@@ -45,6 +46,7 @@ export interface ApiResponse {
   };
   entry: {
     word: string;
+    primary_meaning?: string;
     phonetics: {
       en_en?: string;
       en_vi?: string;

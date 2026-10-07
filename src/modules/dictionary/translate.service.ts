@@ -1,4 +1,5 @@
 import { ApiResponse, ApiPartOfSpeech, OxfordRawEntry } from './dictionary.types';
+import { EvdictService } from './evdict.service';
 
 const POS_MAP: Record<string, string> = {
   noun: 'Danh từ',
@@ -56,18 +57,42 @@ export class TranslateService {
   }
 
   /**
-   * Transform raw Oxford entries into ApiResponse format with Vietnamese translations
+   * Transform raw Oxford entries into ApiResponse format with concise, clear Vietnamese translations
    */
   static async transformToApiResponse(entries: OxfordRawEntry[]): Promise<ApiResponse> {
     const primary = entries[0];
     const enEnParts: ApiPartOfSpeech[] = [];
     const enViParts: ApiPartOfSpeech[] = [];
 
+    // Lookup word in concise EVdict
+    const evEntry = EvdictService.lookup(primary.headword);
+
+    // Determine concise primary meaning for headword
+    let primaryMeaning = evEntry?.primaryMeaning || '';
+    if (!primaryMeaning) {
+      primaryMeaning = await this.translateToVi(primary.headword);
+    }
+    primaryMeaning = EvdictService.capitalize(primaryMeaning);
+
     const allSimilarTerms: string[] = [];
     for (const entry of entries) {
       for (const term of entry.similarTerms) {
         if (!allSimilarTerms.includes(term) && allSimilarTerms.length < 10) {
           allSimilarTerms.push(term);
+        }
+      }
+    }
+
+    // Add idioms from EVdict if available
+    if (evEntry) {
+      for (const p of evEntry.posList) {
+        for (const idiomItem of p.idioms || []) {
+          const displayIdiom = idiomItem.meaning
+            ? `${idiomItem.idiom} (${idiomItem.meaning})`
+            : idiomItem.idiom;
+          if (!allSimilarTerms.includes(displayIdiom) && allSimilarTerms.length < 12) {
+            allSimilarTerms.push(displayIdiom);
+          }
         }
       }
     }
@@ -83,8 +108,15 @@ export class TranslateService {
       });
 
       // 2. English - Vietnamese part of speech
+      const posCat = EvdictService.getPosCategory(entry.pos);
+      const evPos = evEntry?.posList.find((p) => p.category === posCat) || evEntry?.posList[0];
+      const evMeanings = evPos ? [...evPos.meanings] : [];
+
       // Translate all definitions in parallel
       const defTranslations = await this.translateBatch(entry.senses.map((s) => s.def));
+
+      // Match senses to concise everyday Vietnamese meanings
+      const matchedSenses = EvdictService.matchSenseMeanings(entry.senses, evMeanings, defTranslations);
 
       // Translate all examples in parallel
       const allExamples = entry.senses.flatMap((s) => s.examples);
@@ -92,14 +124,21 @@ export class TranslateService {
 
       let exIndex = 0;
       const viSenses = entry.senses.map((s, idx) => {
-        const viMeaning = defTranslations[idx] || s.def;
+        const m = matchedSenses[idx];
+        const conciseMeaning = m?.concise || defTranslations[idx] || s.def;
+        const detail =
+          m?.detail && m.detail.toLowerCase() !== conciseMeaning.toLowerCase()
+            ? m.detail
+            : undefined;
+
         const examples = s.examples.map((en) => {
           const vn = exTranslations[exIndex++] || '';
           return { en, vn };
         });
 
         return {
-          vn_meaning: viMeaning,
+          vn_meaning: conciseMeaning,
+          def_detail: detail,
           examples,
         };
       });
@@ -129,6 +168,7 @@ export class TranslateService {
       },
       entry: {
         word: primary.headword,
+        primary_meaning: primaryMeaning,
         phonetics: {
           en_en: primary.phonAm || primary.phonBr,
           en_vi: primary.phonBr || primary.phonAm,
