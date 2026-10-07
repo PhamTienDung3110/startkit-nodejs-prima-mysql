@@ -76,7 +76,7 @@ export function createApp() {
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpecs));
 
   // Health check endpoint - kiểm tra server có hoạt động không
-  app.get('/health', (_req, res) => res.json({ ok: true }));
+  app.get(['/health', '/api/health'], (_req, res) => res.json({ ok: true }));
 
   // API documentation redirect
   app.get('/docs', (_req, res) => res.redirect('/api-docs'));
